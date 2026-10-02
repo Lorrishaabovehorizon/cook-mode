@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description"
+        content="Cook Mode — a hands-free, voice-guided recipe experience built on the Web Speech API (SIT774 Task 10.3HD)." />
+  <meta name="theme-color" content="#1f6f54" />
+  <title>Cook Mode — Hands-Free Recipes</title>
+
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+  <!-- ================= NORMAL RECIPE PAGE (the reliable visual fallback) ================= -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <p class="eyebrow">SIT774 · Task 10.3HD</p>
+      <h1 class="logo">Cook&nbsp;Mode</h1>
+      <p class="tagline">A hands-free, voice-guided way to cook — built on the Web Speech API.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Recipe header -->
+    <section class="recipe-head" aria-labelledby="recipeTitle">
+      <div class="recipe-photo" role="img" aria-label="Photo of the finished dish"></div>
+      <div class="recipe-meta">
+        <h2 id="recipeTitle">Garlic Butter Pasta</h2>
+        <p id="recipeSummary" class="muted">A quick weeknight pasta — 5 ingredients, one pan, ready in about 20 minutes.</p>
+        <ul class="facts">
+          <li><strong id="factServes">Serves 2</strong></li>
+          <li><strong id="factTime">~20 min</strong></li>
+          <li><strong id="factSteps">6 steps</strong></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Resume banner: shown only when IndexedDB has a saved position for this recipe -->
+    <div id="resumeBanner" class="resume-banner" hidden>
+      <span id="resumeText">You were on a step earlier.</span>
+      <button id="resumeBtn" class="btn btn-small" type="button">Resume</button>
+      <button id="resumeDismiss" class="btn btn-ghost btn-small" type="button" aria-label="Dismiss resume">Dismiss</button>
+    </div>
+
+    <!-- Ingredients -->
+    <section class="card" aria-labelledby="ingHead">
+      <h3 id="ingHead">Ingredients</h3>
+      <ul id="ingredientList" class="ingredients"></ul>
+    </section>
+
+    <!-- ========== The single high-contrast entry point, directly above the method ========== -->
+    <div class="enter-row">
+      <button id="enterCookMode" class="btn btn-primary btn-xl" type="button">
+        <span class="mic-dot" aria-hidden="true"></span> Enter Cook Mode
+      </button>
+      <p class="enter-note muted">
+        Reads each step aloud and listens for “next”, “back”, “repeat” or “set a timer”.
+        Works with touch too — the microphone is never required.
+      </p>
+    </div>
+
+    <!-- Method -->
+    <section class="card" aria-labelledby="methodHead">
+      <h3 id="methodHead">Method</h3>
+      <ol id="methodList" class="method"></ol>
+    </section>
+
+    <footer class="site-footer">
+      <p class="muted">Voice runs entirely in your browser. No audio is sent to or stored on any server.</p>
+      <p class="muted">Lorrisha Franklin · s226438341 · SIT774 T2 2026</p>
+    </footer>
+  </main>
+
+  <!-- ================= COOK MODE OVERLAY (full-screen, voice + touch) ================= -->
+  <!-- role=dialog + aria-modal so assistive tech treats this as a focused view -->
+  <div id="cookMode" class="cook-mode" role="dialog" aria-modal="true" aria-labelledby="cmStepText" hidden>
+
+    <!-- (A) Just-in-time microphone consent — shown first, explains WHY before asking -->
+    <div id="consent" class="consent">
+      <div class="consent-box">
+        <h2>Turn on voice control?</h2>
+        <p>
+          Cook Mode can read each step aloud and listen for simple commands like
+          <em>“next”</em>, <em>“back”</em>, <em>“repeat”</em> and <em>“set a 10 minute timer”</em>,
+          so you never have to touch the screen with messy hands.
+        </p>
+        <p class="muted small">
+          Your voice is processed by your browser for recognition only. No audio leaves your device.
+        </p>
+        <div class="consent-actions">
+          <button id="enableVoice" class="btn btn-primary btn-lg" type="button">Enable voice</button>
+          <button id="notNow" class="btn btn-ghost btn-lg" type="button">Not now — use touch</button>
+        </div>
+        <p id="unsupportedNote" class="unsupported" hidden>
+          Voice recognition isn’t available in this browser, so Cook Mode will run in touch mode.
+          (Speech recognition works best in Chrome or Edge.)
+        </p>
+      </div>
+    </div>
+
+    <!-- (B) The active cooking view -->
+    <div id="cookView" class="cook-view" hidden>
+      <div class="cook-top">
+        <!-- Live progress -->
+        <p class="progress" aria-hidden="true"><span id="progressNow">1</span> / <span id="progressTotal">6</span></p>
+        <div class="progress-track" aria-hidden="true"><div id="progressBar" class="progress-fill"></div></div>
+
+        <!-- Listening indicator reflects the voice state machine -->
+        <div id="listenPill" class="listen-pill state-idle">
+          <span class="listen-dot" aria-hidden="true"></span>
+          <span id="listenLabel">Touch mode</span>
+        </div>
+      </div>
+
+      <!-- The one oversized step. aria-live=polite announces changes to screen readers. -->
+      <div class="step-stage">
+        <p id="cmStepIngredients" class="step-ingredients"></p>
+        <p id="cmStepText" class="step-text" aria-live="polite">Step text appears here.</p>
+      </div>
+
+      <!-- Running timer display -->
+      <div id="timerWrap" class="timer" hidden>
+        <span class="timer-label">Timer</span>
+        <span id="timerDisplay" class="timer-value">00:00</span>
+        <button id="cancelTimer" class="btn btn-ghost btn-small" type="button">Cancel</button>
+      </div>
+
+      <!-- Status / recognised-command line (assertive so the latest action is read out) -->
+      <p id="statusLine" class="status-line" aria-live="assertive"></p>
+
+      <!-- Command chips: they are the on-screen hints AND real tap controls -->
+      <nav class="chips" aria-label="Cook Mode controls">
+        <button class="chip" data-cmd="back"   type="button"><kbd>←</kbd> Back</button>
+        <button class="chip" data-cmd="repeat" type="button"><kbd>R</kbd> Repeat</button>
+        <button class="chip" data-cmd="next"   type="button"><kbd>→</kbd> Next</button>
+        <button class="chip" data-cmd="timer"  type="button"><kbd>T</kbd> 5-min timer</button>
+        <button class="chip chip-exit" data-cmd="exit" type="button"><kbd>Esc</kbd> Exit</button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Recipe data, then the Cook Mode engine. Modules are deferred automatically. -->
+  <script src="js/recipes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

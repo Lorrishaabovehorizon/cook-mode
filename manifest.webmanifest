@@ -1,0 +1,13 @@
+{
+  "name": "Cook Mode — Hands-Free Recipes",
+  "short_name": "Cook Mode",
+  "description": "A hands-free, voice-guided recipe experience built on the Web Speech API.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#1f6f54",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
